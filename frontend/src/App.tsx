@@ -8,6 +8,8 @@ import Voice from '@/pages/Voice';
 import Gesture from '@/pages/Gesture';
 import Browser from '@/pages/Browser';
 import Desktop from '@/pages/Desktop';
+import TaskView from '@/pages/TaskView';     // <-- Added import
+import Analytics from '@/pages/Analytics';   // <-- Added import
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import MainLayout from '@/components/layout/MainLayout';
 
@@ -33,9 +35,11 @@ function App() {
               <Route path="/browser" element={<Browser />} />
               <Route path="/desktop" element={<Desktop />} />
               
+              {/* Newly Integrated Modules */}
+              <Route path="/tasks" element={<TaskView />} />
+              <Route path="/analytics" element={<Analytics />} />
+              
               {/* Placeholders for upcoming modules */}
-              <Route path="/tasks" element={<div className="glass p-6 rounded-xl">Task Queue Placeholder</div>} />
-              <Route path="/analytics" element={<div className="glass p-6 rounded-xl">Analytics Placeholder</div>} />
               <Route path="/settings" element={<div className="glass p-6 rounded-xl">Settings Placeholder</div>} />
             </Route>
           </Route>

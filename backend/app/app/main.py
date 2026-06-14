@@ -26,7 +26,6 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     print("Backend Started")
-    await browser_agent.initialize()
 
 app.add_middleware(
     CORSMiddleware,

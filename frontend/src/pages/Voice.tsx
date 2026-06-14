@@ -1,16 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAgentStore } from '@/store/useAgentStore';
-import { Mic, MicOff, BrainCircuit, TerminalSquare, AudioLines } from 'lucide-react';
+import { Mic, MicOff, BrainCircuit, TerminalSquare, AudioLines, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export default function Voice() {
-  const { transcript, intent, sendCommand } = useAgentStore();
+  const { 
+    transcript, 
+    intent, 
+    sendCommand, 
+    isProcessingVoice, 
+    setVoiceProcessing, 
+    clearVoiceData 
+  } = useAgentStore();
+  
   const [isRecording, setIsRecording] = useState(false);
   
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
-  
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -54,10 +61,7 @@ export default function Voice() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.lineWidth = 3;
 
-      // Sensitive threshold for normal speaking volumes
-      const NOISE_THRESHOLD = 12; 
-
-      if (maxDeviation < NOISE_THRESHOLD) {
+      if (maxDeviation < 12) {
         ctx.strokeStyle = '#a78bfa'; 
         ctx.beginPath();
         ctx.moveTo(0, canvas.height / 2);
@@ -84,6 +88,7 @@ export default function Voice() {
 
   const startRecording = async () => {
     try {
+      clearVoiceData(); // <--- CLEARS OLD TEXT FROM SCREEN
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -119,25 +124,24 @@ export default function Voice() {
   };
 
   const stopRecording = () => {
+    setIsRecording(false);
+    setVoiceProcessing(true); // <--- IMMEDIATELY SHOWS LOADING SPINNER
+
     if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
       mediaRecorder.current.stop();
-      setIsRecording(false);
-      
+    }
+    
+    try {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-      if (audioContextRef.current) audioContextRef.current.close();
-      
-      drawFlatLine();
-    }
+    } catch (e) {}
+    
+    drawFlatLine();
   };
 
-  // Safe Toggle
   const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
+    if (isRecording) stopRecording();
+    else startRecording();
   };
 
   useEffect(() => {
@@ -176,31 +180,37 @@ export default function Voice() {
               
               <Button
                 size="icon"
+                disabled={isProcessingVoice} 
                 className={cn(
                   "relative h-32 w-32 rounded-full shadow-2xl transition-all duration-500 border-4 border-white/20 dark:border-white/5 backdrop-blur-md",
                   isRecording 
                     ? "bg-primary text-white scale-105" 
-                    : "bg-white/50 dark:bg-black/50 text-foreground hover:scale-105 hover:bg-white/80 dark:hover:bg-white/10"
+                    : isProcessingVoice 
+                      ? "bg-secondary text-primary cursor-not-allowed" 
+                      : "bg-white/50 dark:bg-black/50 text-foreground hover:scale-105 hover:bg-white/80 dark:hover:bg-white/10"
                 )}
                 onClick={toggleRecording} 
               >
-                {isRecording ? <MicOff className="h-12 w-12 animate-pulse" /> : <Mic className="h-12 w-12" />}
+                {isRecording ? (
+                  <MicOff className="h-12 w-12 animate-pulse" />
+                ) : isProcessingVoice ? (
+                  <Loader2 className="h-12 w-12 animate-spin" />
+                ) : (
+                  <Mic className="h-12 w-12" />
+                )}
               </Button>
             </div>
 
             <div className="w-full max-w-[250px] h-16">
-              <canvas 
-                ref={canvasRef} 
-                width="250" 
-                height="64" 
-                className="w-full h-full opacity-80"
-              />
+              <canvas ref={canvasRef} width="250" height="64" className="w-full h-full opacity-80" />
             </div>
             
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-semibold tracking-tight">{isRecording ? "Listening to your command..." : "Click to Speak"}</h3>
+              <h3 className="text-xl font-semibold tracking-tight">
+                {isRecording ? "Listening to your command..." : isProcessingVoice ? "Processing AI Intent..." : "Click to Speak"}
+              </h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                {isRecording ? "Click the button again when finished." : <span>Try saying: <span className="text-foreground font-medium">"Open Chrome and go to Instagram"</span></span>}
+                {isRecording ? "Click the button again when finished." : isProcessingVoice ? "Analyzing audio via backend pipeline..." : <span>Try saying: <span className="text-foreground font-medium">"Open Chrome and go to Instagram"</span></span>}
               </p>
             </div>
           </div>
@@ -215,7 +225,15 @@ export default function Voice() {
               <h3 className="font-semibold tracking-wide">Whisper Transcript</h3>
             </div>
             <p className="font-mono text-sm leading-relaxed text-foreground/80 break-words flex-1">
-              {transcript ? `> ${transcript}` : <span className="text-muted-foreground italic">Awaiting audio input stream...</span>}
+              {isProcessingVoice ? (
+                <span className="flex items-center text-primary animate-pulse">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transcribing audio...
+                </span>
+              ) : transcript ? (
+                `> ${transcript}`
+              ) : (
+                <span className="text-muted-foreground italic">Awaiting audio input stream...</span>
+              )}
             </p>
           </div>
 
@@ -227,7 +245,15 @@ export default function Voice() {
               <h3 className="font-semibold tracking-wide text-primary">Gemini Execution Payload</h3>
             </div>
             <pre className="font-mono text-xs leading-relaxed text-primary/80 overflow-x-auto custom-scrollbar flex-1">
-              {intent ? JSON.stringify(intent, null, 2) : "{\n  // Awaiting AI intent inference pipeline...\n}"}
+              {isProcessingVoice ? (
+                <span className="flex items-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Awaiting intent inference...
+                </span>
+              ) : intent ? (
+                JSON.stringify(intent, null, 2)
+              ) : (
+                "{\n  // Awaiting AI intent inference pipeline...\n}"
+              )}
             </pre>
           </div>
         </div>

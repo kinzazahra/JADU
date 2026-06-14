@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useAgentStore } from '@/store/useAgentStore';
 import { 
-  MonitorPlay, 
   Keyboard, 
   MousePointer2, 
   Volume2, 
   VolumeX, 
   AppWindow, 
   Power, 
-  Command 
+  Command,
+  Loader2 // <-- Added for the loading spinner
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,12 +16,25 @@ import { Input } from '@/components/ui/input';
 export default function Desktop() {
   const { sendCommand } = useAgentStore();
   const [textToType, setTextToType] = useState('JADU is online.');
+  
+  // State to track if we are currently sending text
+  const [isInjecting, setIsInjecting] = useState(false);
 
   const handleType = () => {
-    if (!textToType.trim()) return;
+    if (!textToType.trim() || isInjecting) return;
+    
+    setIsInjecting(true);
+
+    // Send the command to PyAutoGUI backend
     sendCommand('desktop_action', { 
       intent: { action: 'desktop', steps: ['type'], target: textToType } 
     });
+
+    // Reset button UI and clear input after a short delay
+    setTimeout(() => {
+      setIsInjecting(false);
+      setTextToType(''); // Clear the input field for the next message
+    }, 800); 
   };
 
   const handleShortcut = (keys: string) => {
@@ -34,6 +47,16 @@ export default function Desktop() {
     sendCommand('desktop_action', { 
       intent: { action: 'desktop', steps: ['click'] } 
     });
+  };
+
+  const handleStartMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleShortcut('win'); 
+  };
+
+  const handleTaskView = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleShortcut('win+tab');
   };
 
   return (
@@ -56,12 +79,29 @@ export default function Desktop() {
                 placeholder="Text to simulate typing globally..." 
                 value={textToType}
                 onChange={(e) => setTextToType(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleType()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleType();
+                }}
+                disabled={isInjecting} // Disable input while injecting
               />
             </div>
-            <Button onClick={handleType} className="h-11 px-8 shadow-sm">
-              Inject Keystrokes
+            
+            {/* Upgraded Button with Loading State */}
+            <Button 
+              onClick={handleType} 
+              disabled={isInjecting || !textToType.trim()} 
+              className="h-11 px-8 shadow-sm w-48 transition-all"
+            >
+              {isInjecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Injecting...
+                </>
+              ) : (
+                'Inject Keystrokes'
+              )}
             </Button>
+
           </div>
         </div>
 
@@ -70,12 +110,12 @@ export default function Desktop() {
           <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">System Quick Actions</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             
-            <Button variant="outline" onClick={() => handleShortcut('win')} className="h-28 flex flex-col items-center justify-center space-y-3 bg-secondary/20 hover:bg-primary/10 transition-all">
+            <Button variant="outline" onClick={handleStartMenu} className="h-28 flex flex-col items-center justify-center space-y-3 bg-secondary/20 hover:bg-primary/10 transition-all">
               <Command className="h-7 w-7 text-primary" />
               <span className="font-medium text-sm">Start Menu</span>
             </Button>
             
-            <Button variant="outline" onClick={() => handleShortcut('win+tab')} className="h-28 flex flex-col items-center justify-center space-y-3 bg-secondary/20 hover:bg-primary/10 transition-all">
+            <Button variant="outline" onClick={handleTaskView} className="h-28 flex flex-col items-center justify-center space-y-3 bg-secondary/20 hover:bg-primary/10 transition-all">
               <AppWindow className="h-7 w-7 text-primary" />
               <span className="font-medium text-sm">Task View</span>
             </Button>

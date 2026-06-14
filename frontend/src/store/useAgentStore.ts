@@ -8,14 +8,17 @@ interface AgentState {
   detectedGesture: string;
   transcript: string;
   intent: any;
-  sendCommand: (action: string, payload?: any) => void; // New Global Command Sender
+  isProcessingVoice: boolean; // <-- Tracks the loading state globally
   
+  sendCommand: (action: string, payload?: any) => void; 
   setIsConnected: (status: boolean) => void;
   updateSystemStats: (cpu: string, memory: string) => void;
   setActiveTask: (task: string) => void;
   setDetectedGesture: (gesture: string) => void;
   setVoiceData: (transcript: string, intent: any) => void;
-  setSendCommand: (fn: (action: string, payload?: any) => void) => void; // Setter
+  setVoiceProcessing: (status: boolean) => void; // <-- Setter for loading
+  clearVoiceData: () => void; // <-- Clears old text when you start speaking
+  setSendCommand: (fn: (action: string, payload?: any) => void) => void;
 }
 
 export const useAgentStore = create<AgentState>((set) => ({
@@ -26,12 +29,24 @@ export const useAgentStore = create<AgentState>((set) => ({
   detectedGesture: 'None',
   transcript: '',
   intent: null,
-  sendCommand: () => console.warn("WebSocket not initialized yet"), // Default no-op
+  isProcessingVoice: false,
+  sendCommand: () => console.warn("WebSocket not initialized yet"), 
   
   setIsConnected: (status) => set({ isConnected: status }),
   updateSystemStats: (cpu, memory) => set({ cpu, memory }),
   setActiveTask: (task) => set({ activeTask: task }),
   setDetectedGesture: (gesture) => set({ detectedGesture: gesture }),
-  setVoiceData: (transcript, intent) => set({ transcript, intent, activeTask: intent?.action || 'Idle' }),
+  
+  setVoiceProcessing: (status) => set({ isProcessingVoice: status }),
+  clearVoiceData: () => set({ transcript: '', intent: null }),
+  
+  // This automatically TURNS OFF the loading spinner when data arrives!
+  setVoiceData: (transcript, intent) => set({ 
+    transcript, 
+    intent, 
+    activeTask: intent?.action || 'Idle',
+    isProcessingVoice: false 
+  }),
+  
   setSendCommand: (fn) => set({ sendCommand: fn }),
 }));
