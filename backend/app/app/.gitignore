@@ -1,0 +1,5 @@
+# backend/.gitignore
+firebase-credentials.json
+.env
+__pycache__/
+venv/
